@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Extreme Weather Early Warning System</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <header>
+    <h1>🌦️ Extreme Weather Early-Warning AI System</h1>
+    <p>AI-driven climate risk monitoring</p>
+  </header>
+
+  <!-- Controls -->
+  <section class="controls">
+    <select id="locationSelect">
+      <option value="">Select Location</option>
+    </select>
+    <input type="date" id="dateSelect" />
+    <button onclick="updateDashboard()">Analyze</button>
+  </section>
+
+  <!-- Cards -->
+  <section class="cards">
+    <div class="card">🌡 Max Temp <span id="maxTemp">--</span>°C</div>
+    <div class="card">🌧 Rainfall <span id="rainfall">--</span> mm</div>
+    <div class="card">💧 Humidity <span id="humidity">--</span>%</div>
+    <div class="card">💨 Wind <span id="wind">--</span> km/h</div>
+  </section>
+
+  <!-- Risk Box -->
+  <section id="riskBox" class="risk low">
+    <h2>AI Risk Level: <span id="riskLevel">--</span></h2>
+    <p id="alertText">Select location and date to analyze weather risk</p>
+  </section>
+
+  <!-- Charts -->
+  <section class="charts">
+    <div class="chart-container">
+      <h3>Temperature Trends</h3>
+      <canvas id="tempChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <h3>Rainfall Analysis</h3>
+      <canvas id="rainChart"></canvas>
+    </div>
+  </section>
+
+  <footer>
+    <p>Powered by AI • RandomForest ML Model • 99.56% Accuracy</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
