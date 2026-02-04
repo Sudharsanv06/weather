@@ -1,8 +1,8 @@
 let weatherData = [];
 let tempChart, rainChart;
-let latestDate = "";
 
-// Forecast horizon limit (days)
+// Define TODAY as reference point for forecasting
+const TODAY = new Date("2026-02-04"); // For demo - use new Date() for production
 const FORECAST_DAYS_LIMIT = 7;
 
 // Load CSV data on page load
@@ -12,23 +12,15 @@ Papa.parse("master_indian_weather_dataset.csv", {
   complete: function(results) {
     weatherData = results.data.filter(row => row.location && row.date); // Filter out empty rows
     console.log(`✓ Loaded ${weatherData.length} weather records`);
+    console.log(`✓ Today's date: ${TODAY.toISOString().split('T')[0]}`);
+    console.log(`✓ Forecast window: ${TODAY.toISOString().split('T')[0]} to ${new Date(TODAY.getTime() + FORECAST_DAYS_LIMIT * 24*60*60*1000).toISOString().split('T')[0]}`);
     populateControls();
-    setLatestDate();
   },
   error: function(error) {
     console.error("Error loading CSV:", error);
     alert("Failed to load weather data. Make sure the CSV file is in the frontend folder.");
   }
 });
-
-function setLatestDate() {
-  // Find the latest date in the dataset
-  latestDate = weatherData
-    .map(d => d.date)
-    .sort()
-    .slice(-1)[0];
-  console.log(`✓ Latest date in dataset: ${latestDate}`);
-}
 
 function populateControls() {
   // Get unique locations
@@ -66,33 +58,41 @@ function updateDashboard() {
     return;
   }
 
-  // Calculate days ahead from latest dataset date
+  // Calculate days from TODAY (not from latest dataset date)
   const selectedDate = new Date(date);
-  const lastDataDate = new Date(latestDate);
-  const diffTime = selectedDate - lastDataDate;
-  const daysAhead = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const diffTime = selectedDate - TODAY;
+  const daysFromToday = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-  // Check if date is within forecast window
-  if (daysAhead > 0 && daysAhead <= FORECAST_DAYS_LIMIT) {
-    showFutureForecast(location, daysAhead);
+  console.log(`Selected: ${date}, Days from today: ${daysFromToday}`);
+
+  // 1️⃣ PAST DATES → Historical data
+  if (daysFromToday < 0) {
+    const row = weatherData.find(d => d.location === location && d.date === date);
+    
+    if (!row) {
+      alert(`No historical data available for ${location} on ${date}`);
+      return;
+    }
+    
+    showHistoricalData(row);
     return;
   }
 
-  // Check if date is beyond forecast horizon
-  if (daysAhead > FORECAST_DAYS_LIMIT) {
-    showForecastUnavailable(daysAhead);
+  // 2️⃣ TODAY + NEXT 7 DAYS → Forecast
+  if (daysFromToday >= 0 && daysFromToday <= FORECAST_DAYS_LIMIT) {
+    showFutureForecast(location, daysFromToday);
     return;
   }
 
-  // Find matching row for historical data
-  const row = weatherData.find(d => d.location === location && d.date === date);
-  
-  if (!row) {
-    alert(`No data available for ${location} on ${date}. Try a date between ${weatherData[0].date} and ${latestDate}`);
+  // 3️⃣ BEYOND 7 DAYS → Not available
+  if (daysFromToday > FORECAST_DAYS_LIMIT) {
+    showForecastUnavailable(daysFromToday);
     return;
   }
+}
 
-  // Update weather cards
+function showHistoricalData(row) {
+  // Update weather cards with historical data
   document.getElementById("maxTemp").textContent = parseFloat(row.max_temperature).toFixed(1);
   document.getElementById("rainfall").textContent = parseFloat(row.rainfall).toFixed(1);
   document.getElementById("humidity").textContent = parseFloat(row.humidity).toFixed(1);
@@ -216,9 +216,9 @@ function renderCharts(location) {
   });
 }
 
-function showFutureForecast(location, daysAhead) {
+function showFutureForecast(location, daysFromToday) {
   /**
-   * Forecast mode for future dates within the forecast window
+   * Forecast mode for future dates within the forecast window (Feb 4-11)
    * Uses near-future risk forecasting based on recent trends
    */
   
@@ -263,11 +263,15 @@ function showFutureForecast(location, daysAhead) {
 
   document.getElementById("riskLevel").textContent = `${forecastedRisk} (Forecasted)`;
   
-  // Set forecast alert text with days ahead
+  // Set forecast alert text - special handling for "today"
+  const timeframe = daysFromToday === 0 ? "today" : `next ${daysFromToday} day(s)`;
+  const forecastEnd = new Date(TODAY.getTime() + FORECAST_DAYS_LIMIT * 24*60*60*1000);
+  const windowText = `(${TODAY.toISOString().split('T')[0]} – ${forecastEnd.toISOString().split('T')[0]} window)`;
+  
   const alertMessages = {
-    high: `🔮 FORECASTED: Severe weather risk predicted for next ${daysAhead} day(s). Based on recent climate trends.`,
-    moderate: `🔮 FORECASTED: Moderate risk conditions expected for next ${daysAhead} day(s). Based on recent trends.`,
-    low: `🔮 FORECASTED: Normal weather conditions expected for next ${daysAhead} day(s). Based on recent patterns.`
+    high: `🔮 FORECASTED: Severe weather risk predicted for ${timeframe}. Based on recent climate trends ${windowText}`,
+    moderate: `🔮 FORECASTED: Moderate risk conditions expected for ${timeframe}. Based on recent trends ${windowText}`,
+    low: `🔮 FORECASTED: Normal weather conditions expected for ${timeframe}. Based on recent patterns ${windowText}`
   };
   
   document.getElementById("alertText").textContent = alertMessages[riskLevel];
@@ -275,12 +279,12 @@ function showFutureForecast(location, daysAhead) {
   // Render charts with recent historical data
   renderCharts(location);
   
-  console.log(`✓ Forecast mode activated for ${location} (${daysAhead} days ahead)`);
+  console.log(`✓ Forecast mode activated for ${location} (${daysFromToday} days from today)`);
 }
 
-function showForecastUnavailable(daysAhead) {
+function showForecastUnavailable(daysFromToday) {
   /**
-   * Display message when forecast is beyond the supported horizon
+   * Display message when forecast is beyond the 7-day window
    */
   
   // Clear all weather cards
@@ -295,8 +299,11 @@ function showForecastUnavailable(daysAhead) {
 
   document.getElementById("riskLevel").textContent = "Unavailable";
 
-  document.getElementById("alertText").textContent =
-    `⚠️ Forecast not available for ${daysAhead} days ahead. Please select a date within the next ${FORECAST_DAYS_LIMIT} days for reliable predictions.`;
+  const forecastEnd = new Date(TODAY.getTime() + FORECAST_DAYS_LIMIT * 24*60*60*1000);
+  const windowText = `${TODAY.toISOString().split('T')[0]} – ${forecastEnd.toISOString().split('T')[0]}`;
   
-  console.log(`⚠️ Forecast unavailable: ${daysAhead} days exceeds ${FORECAST_DAYS_LIMIT}-day limit`);
+  document.getElementById("alertText").textContent =
+    `⚠️ Climate forecast is available only up to 7 days ahead (${windowText}). Selected date is ${daysFromToday} days ahead.`;
+  
+  console.log(`⚠️ Forecast unavailable: ${daysFromToday} days exceeds ${FORECAST_DAYS_LIMIT}-day window`);
 }
