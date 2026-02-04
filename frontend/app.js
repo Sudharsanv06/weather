@@ -2,6 +2,9 @@ let weatherData = [];
 let tempChart, rainChart;
 let latestDate = "";
 
+// Forecast horizon limit (days)
+const FORECAST_DAYS_LIMIT = 7;
+
 // Load CSV data on page load
 Papa.parse("master_indian_weather_dataset.csv", {
   download: true,
@@ -63,9 +66,21 @@ function updateDashboard() {
     return;
   }
 
-  // Check if selected date is in the future (beyond dataset range)
-  if (date > latestDate) {
-    showFutureForecast(location, date);
+  // Calculate days ahead from latest dataset date
+  const selectedDate = new Date(date);
+  const lastDataDate = new Date(latestDate);
+  const diffTime = selectedDate - lastDataDate;
+  const daysAhead = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  // Check if date is within forecast window
+  if (daysAhead > 0 && daysAhead <= FORECAST_DAYS_LIMIT) {
+    showFutureForecast(location, daysAhead);
+    return;
+  }
+
+  // Check if date is beyond forecast horizon
+  if (daysAhead > FORECAST_DAYS_LIMIT) {
+    showForecastUnavailable(daysAhead);
     return;
   }
 
@@ -201,9 +216,9 @@ function renderCharts(location) {
   });
 }
 
-function showFutureForecast(location, date) {
+function showFutureForecast(location, daysAhead) {
   /**
-   * Forecast mode for future dates
+   * Forecast mode for future dates within the forecast window
    * Uses near-future risk forecasting based on recent trends
    */
   
@@ -235,11 +250,11 @@ function showFutureForecast(location, date) {
     forecastedRisk = "Moderate";
   }
 
-  // Update weather cards with forecasted values
-  document.getElementById("maxTemp").textContent = avgMaxTemp.toFixed(1);
-  document.getElementById("rainfall").textContent = avgRainfall.toFixed(1);
-  document.getElementById("humidity").textContent = avgHumidity.toFixed(1);
-  document.getElementById("wind").textContent = avgWind.toFixed(1);
+  // Update weather cards with forecasted values (using ≈ symbol to indicate approximation)
+  document.getElementById("maxTemp").textContent = `≈ ${avgMaxTemp.toFixed(1)}`;
+  document.getElementById("rainfall").textContent = `≈ ${avgRainfall.toFixed(1)}`;
+  document.getElementById("humidity").textContent = `≈ ${avgHumidity.toFixed(1)}`;
+  document.getElementById("wind").textContent = `≈ ${avgWind.toFixed(1)}`;
 
   // Update risk level
   const riskBox = document.getElementById("riskBox");
@@ -248,12 +263,11 @@ function showFutureForecast(location, date) {
 
   document.getElementById("riskLevel").textContent = `${forecastedRisk} (Forecasted)`;
   
-  // Set forecast alert text
-  const daysDiff = Math.ceil((new Date(date) - new Date(latestDate)) / (1000 * 60 * 60 * 24));
+  // Set forecast alert text with days ahead
   const alertMessages = {
-    high: `🔮 FORECASTED: Severe weather risk predicted for ${daysDiff} days ahead. Based on recent climate trends.`,
-    moderate: `🔮 FORECASTED: Moderate risk conditions expected for ${daysDiff} days ahead. Monitor weather updates.`,
-    low: `🔮 FORECASTED: Normal weather conditions expected for ${daysDiff} days ahead. Based on recent patterns.`
+    high: `🔮 FORECASTED: Severe weather risk predicted for next ${daysAhead} day(s). Based on recent climate trends.`,
+    moderate: `🔮 FORECASTED: Moderate risk conditions expected for next ${daysAhead} day(s). Based on recent trends.`,
+    low: `🔮 FORECASTED: Normal weather conditions expected for next ${daysAhead} day(s). Based on recent patterns.`
   };
   
   document.getElementById("alertText").textContent = alertMessages[riskLevel];
@@ -261,5 +275,28 @@ function showFutureForecast(location, date) {
   // Render charts with recent historical data
   renderCharts(location);
   
-  console.log(`✓ Forecast mode activated for ${location} (${daysDiff} days ahead)`);
+  console.log(`✓ Forecast mode activated for ${location} (${daysAhead} days ahead)`);
+}
+
+function showForecastUnavailable(daysAhead) {
+  /**
+   * Display message when forecast is beyond the supported horizon
+   */
+  
+  // Clear all weather cards
+  document.getElementById("maxTemp").textContent = "--";
+  document.getElementById("rainfall").textContent = "--";
+  document.getElementById("humidity").textContent = "--";
+  document.getElementById("wind").textContent = "--";
+
+  // Update risk box
+  const riskBox = document.getElementById("riskBox");
+  riskBox.className = "risk";
+
+  document.getElementById("riskLevel").textContent = "Unavailable";
+
+  document.getElementById("alertText").textContent =
+    `⚠️ Forecast not available for ${daysAhead} days ahead. Please select a date within the next ${FORECAST_DAYS_LIMIT} days for reliable predictions.`;
+  
+  console.log(`⚠️ Forecast unavailable: ${daysAhead} days exceeds ${FORECAST_DAYS_LIMIT}-day limit`);
 }
